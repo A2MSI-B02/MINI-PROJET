@@ -1,35 +1,35 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-contract Whitelist {
-    mapping(address => bool) public whitelistedAddresses;
-    address public owner;
+import "./Ownership.sol";
 
-    event Whitelisted(address indexed account);
-    event RemovedFromWhitelist(address indexed account);
+contract Whitelist is Ownership {
+    mapping(address => bool) private whitelistedAddresses;
 
-    constructor() {
-        owner = msg.sender;
-        whitelistedAddresses[msg.sender] = true; // L'initiateur est automatiquement whitelisté
+    event AddressAddedToWhitelist(address indexed participant);
+    event AddressRemovedFromWhitelist(address indexed participant);
+
+    function addToWhitelist(address _participant) public onlyOwner {
+        require(_participant != address(0), "WhitelistManager: Cannot add zero address");
+        require(!whitelistedAddresses[_participant], "WhitelistManager: Address is already whitelisted");
+
+        whitelistedAddresses[_participant] = true;
+        emit AddressAddedToWhitelist(_participant);
     }
 
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Only the contract owner can perform this action");
-        _;
+    function removeFromWhitelist(address _participant) public onlyOwner {
+        require(whitelistedAddresses[_participant], "WhitelistManager: Address is not whitelisted");
+
+        whitelistedAddresses[_participant] = false;
+        emit AddressRemovedFromWhitelist(_participant);
+    }
+
+    function isWhitelisted(address _participant) public view returns (bool) {
+        return whitelistedAddresses[_participant];
     }
 
     modifier onlyWhitelisted() {
-        require(whitelistedAddresses[msg.sender], "You are not authorized");
+        require(whitelistedAddresses[msg.sender], "WhitelistManager: You are not authorized");
         _;
-    }
-
-    function addWhitelisted(address account) public onlyOwner {
-        whitelistedAddresses[account] = true;
-        emit Whitelisted(account);
-    }
-
-    function removeWhitelisted(address account) public onlyOwner {
-        whitelistedAddresses[account] = false;
-        emit RemovedFromWhitelist(account);
     }
 }
