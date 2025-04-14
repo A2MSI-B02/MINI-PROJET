@@ -84,11 +84,11 @@ function App() {
     try {
       const { contract, provider } = await getContract();
 
-      const network = await provider.getNetwork();
-      console.log("Network chainId détecté :", network.chainId);
-      if (network.chainId !== 11155111) {
-        alert("Veuillez vous connecter au réseau Sepolia dans Metamask !");
-        throw new Error("Réseau incorrect");
+      // Vérifiez si l'utilisateur est dans la whitelist
+      const isWhitelisted = await contract.whitelist(currentAccount);
+      if (!isWhitelisted) {
+        alert("Vous n'êtes pas dans la whitelist. Veuillez demander l'accès.");
+        return;
       }
 
       const {
@@ -98,23 +98,43 @@ function App() {
         lotId,
         totalProducts,
         lastOwner,
-        purchaseDate
+        purchaseDate,
       } = newProduct;
 
-      // Lancer la transaction en convertissant les valeurs numériques en bigint
-      const tx = await contract.addProduct(
+      // Convertir les champs en nombres
+      const lotNumberInt = Number(lotNumber) || 0;
+      const totalProductsInt = Number(totalProducts) || 0;
+
+      // Convertir la date en timestamp
+      const purchaseDateTimestamp = Math.floor(new Date(purchaseDate).getTime() / 1000);
+
+      console.log("Données du produit à ajouter :", {
         manufacturer,
-        BigInt(lotNumber),
+        lotNumberInt,
         productName,
         lotId,
-        BigInt(totalProducts),
+        totalProductsInt,
         lastOwner,
-        BigInt(purchaseDate)
+        purchaseDateTimestamp,
+      });
+
+      // Lancer la transaction en envoyant les données
+      const tx = await contract.addProduct(
+        manufacturer,
+        lotNumberInt,
+        productName,
+        lotId,
+        totalProductsInt,
+        lastOwner,
+        purchaseDateTimestamp
       );
+      console.log("Transaction envoyée :", tx);
+
+      // Attendre la confirmation de la transaction
       await tx.wait();
       alert("Produit ajouté avec succès !");
     } catch (error) {
-      console.error(error);
+      console.error("Erreur lors de l'ajout du produit :", error);
       alert("Erreur lors de l'ajout du produit.");
     }
   };
@@ -124,17 +144,37 @@ function App() {
     try {
       const { contract, provider } = await getContract();
 
-      const network = await provider.getNetwork();
-      console.log("Network chainId détecté :", network.chainId);
-      if (network.chainId !== 11155111) {
-        alert("Veuillez vous connecter au réseau Sepolia dans Metamask !");
-        throw new Error("Réseau incorrect");
+      // Vérifiez si l'utilisateur est dans la whitelist
+      const isWhitelisted = await contract.whitelist(currentAccount);
+      if (!isWhitelisted) {
+        alert("Vous n'êtes pas dans la whitelist. Veuillez demander l'accès.");
+        return;
       }
 
-      const product = await contract.getProduct(productId);
-      setProductDetails(product);
+      // Vérifiez si l'ID du produit est valide
+      const productIdInt = parseInt(productId, 10); // Convertir en entier
+      if (!productIdInt || productIdInt <= 0) {
+        alert("Veuillez entrer un ID de produit valide.");
+        return;
+      }
+
+      // Récupérer les détails du produit
+      const product = await contract.getProduct(productIdInt);
+
+      // Convertir les champs numériques de BigInt en number
+      const productDetails = {
+        manufacturer: product.manufacturer,
+        lotNumber: Number(product.lotNumber),
+        productName: product.productName,
+        lotId: product.lotId,
+        totalProducts: Number(product.totalProducts),
+        lastOwner: product.lastOwner,
+        purchaseDate: new Date(Number(product.purchaseDate) * 1000).toLocaleDateString(),
+      };
+
+      setProductDetails(productDetails); // Mettre à jour l'état avec les détails du produit
     } catch (error) {
-      console.error(error);
+      console.error("Erreur lors de la récupération du produit :", error);
       alert("Erreur lors de la récupération du produit.");
     }
   };
@@ -234,9 +274,9 @@ function App() {
           onChange={handleProductChange}
         />
         <input
-          type="number"
+          type="date"
           name="purchaseDate"
-          placeholder="Date d'Achat (timestamp)"
+          placeholder="Date d'Achat"
           value={newProduct.purchaseDate}
           onChange={handleProductChange}
         />
@@ -253,6 +293,8 @@ function App() {
           onChange={(e) => setProductId(e.target.value)}
         />
         <button onClick={getProduct}>Récupérer</button>
+
+        {/* Affichage des détails du produit */}
         {productDetails && (
           <div className="product-details">
             <h3>Détails du Produit :</h3>
@@ -260,7 +302,7 @@ function App() {
               <strong>Fabricant :</strong> {productDetails.manufacturer}
             </p>
             <p>
-              <strong>Numéro de Lot :</strong> {productDetails.lotNumber.toString()}
+              <strong>Numéro de Lot :</strong> {productDetails.lotNumber}
             </p>
             <p>
               <strong>Nom du Produit :</strong> {productDetails.productName}
@@ -269,13 +311,13 @@ function App() {
               <strong>ID du Lot :</strong> {productDetails.lotId}
             </p>
             <p>
-              <strong>Total des Produits :</strong> {productDetails.totalProducts.toString()}
+              <strong>Total des Produits :</strong> {productDetails.totalProducts}
             </p>
             <p>
               <strong>Dernier Propriétaire :</strong> {productDetails.lastOwner}
             </p>
             <p>
-              <strong>Date d'Achat :</strong> {productDetails.purchaseDate.toString()}
+              <strong>Date d'Achat :</strong> {productDetails.purchaseDate}
             </p>
           </div>
         )}
